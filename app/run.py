@@ -13,6 +13,14 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 STREAMLIT_APP = ROOT_DIR / "app" / "main.py"
 
 
+def env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def wait_for_backend(url: str, timeout_seconds: int = 15) -> bool:
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -38,10 +46,17 @@ def stop_process(process: subprocess.Popen[bytes] | None) -> None:
 
 
 def main() -> int:
+    railway_port = os.getenv("PORT")
     api_host = os.getenv("API_HOST", "127.0.0.1")
     api_port = os.getenv("API_PORT", "8000")
-    streamlit_port = os.getenv("STREAMLIT_PORT", "8501")
-    api_base_url = os.getenv("API_BASE_URL", f"http://{api_host}:{api_port}")
+    streamlit_host = os.getenv(
+        "STREAMLIT_HOST",
+        "0.0.0.0" if railway_port else "127.0.0.1",
+    )
+    streamlit_port = os.getenv("STREAMLIT_PORT", railway_port or "8501")
+    api_base_url = os.getenv("API_BASE_URL", f"http://127.0.0.1:{api_port}")
+    api_reload = env_flag("API_RELOAD", default=railway_port is None)
+    streamlit_headless = env_flag("STREAMLIT_HEADLESS", default=railway_port is not None)
 
     env = os.environ.copy()
     existing_pythonpath = env.get("PYTHONPATH")
@@ -64,18 +79,21 @@ def main() -> int:
     signal.signal(signal.SIGTERM, handle_signal)
 
     try:
+        backend_command = [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "api.main:app",
+            "--host",
+            api_host,
+            "--port",
+            api_port,
+        ]
+        if api_reload:
+            backend_command.append("--reload")
+
         backend_process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "uvicorn",
-                "api.main:app",
-                "--host",
-                api_host,
-                "--port",
-                api_port,
-                "--reload",
-            ],
+            backend_command,
             cwd=ROOT_DIR,
             env=env,
         )
@@ -84,18 +102,24 @@ def main() -> int:
             print("Backend did not become ready in time.", file=sys.stderr)
             return 1
 
+        frontend_command = [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(STREAMLIT_APP),
+            "--server.address",
+            streamlit_host,
+            "--server.port",
+            streamlit_port,
+            "--server.headless",
+            str(streamlit_headless).lower(),
+            "--browser.gatherUsageStats",
+            "false",
+        ]
+
         frontend_process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "streamlit",
-                "run",
-                str(STREAMLIT_APP),
-                "--server.port",
-                streamlit_port,
-                "--browser.gatherUsageStats",
-                "false",
-            ],
+            frontend_command,
             cwd=ROOT_DIR,
             env=env,
         )

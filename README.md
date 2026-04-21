@@ -22,3 +22,19 @@ Or run the services separately:
 venv/bin/python -m uvicorn api.main:app --reload
 venv/bin/python -m streamlit run app/main.py
 ```
+
+## Deploy on Railway
+
+This repo now includes a `railpack.json` for a single-service Railway deploy:
+
+- Streamlit is served on Railway's public `PORT`.
+- FastAPI runs inside the same container on `127.0.0.1:8000`.
+- `.dockerignore` keeps the training notebook and raw dataset zip out of the deploy upload.
+
+To deploy, create a Railway service from this repository and let Railway build it with Railpack. The service will start with:
+
+```bash
+python app/run.py
+```
+
+Once Railway assigns a public URL, open that URL and the Streamlit UI will call the colocated FastAPI backend automatically.
