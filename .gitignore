@@ -2,3 +2,5 @@ venv/
 .ipynb_checkpoints/
 NYC.csv
 dataset-cleaning/NYC.csv
+__pycache__/
+*.pyc
