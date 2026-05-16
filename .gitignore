@@ -1,4 +1,5 @@
 venv/
+taste-skill/
 .ipynb_checkpoints/
 NYC.csv
 dataset-cleaning/NYC.csv
